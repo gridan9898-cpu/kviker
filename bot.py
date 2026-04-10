@@ -43,8 +43,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     message = (
-        "Send one URL from YouTube, TikTok, Instagram, Twitter/X, VK, or a normal article page.\n\n"
-        "I will extract the content, transcribe audio/video when needed, and return a concise summary."
+        "Send one YouTube URL or a normal article page.\n\n"
+        "I will extract the content, transcribe YouTube audio when needed, and return a concise summary."
     )
     await update.message.reply_text(message)
 
@@ -56,11 +56,8 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     message = (
         "Supported inputs:\n"
         "• YouTube\n"
-        "• TikTok\n"
-        "• Instagram posts/reels\n"
-        "• Twitter/X\n"
-        "• VK\n"
         "• Generic article URLs\n\n"
+        "Not supported in the hosted version: TikTok, Instagram, Twitter/X, VK.\n\n"
         "Send one public URL per message."
     )
     await update.message.reply_text(message)

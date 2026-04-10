@@ -1,13 +1,9 @@
 # Telegram URL Summary Bot (MVP)
 
-Production-oriented MVP Telegram bot that accepts a URL, extracts the underlying content, transcribes media locally with Whisper when needed, and returns a concise text summary.
+Production-oriented MVP Telegram bot that accepts a supported URL, extracts the underlying content, transcribes YouTube audio locally when needed, and returns a concise text summary.
 
 ## Supported inputs
 - YouTube
-- TikTok
-- Instagram posts / reels
-- Twitter/X
-- VK
 - Generic article URLs
 
 ## Stack
@@ -22,7 +18,7 @@ Production-oriented MVP Telegram bot that accepts a URL, extracts the underlying
 ## How it works
 1. User sends one URL.
 2. Bot detects the domain.
-3. If the URL is a media platform, it downloads the media audio with `yt-dlp`.
+3. If the URL is a YouTube video, it downloads the media audio with `yt-dlp`.
 4. Whisper transcribes locally.
 5. Groq generates a structured summary.
 6. Bot returns the result in Telegram.
@@ -77,8 +73,6 @@ Copy `.env.example` to `.env` and fill:
 - `WHISPER_MODEL` — `tiny` or `base`
 - `WHISPER_DEVICE` — defaults to `cpu`
 - `WHISPER_COMPUTE_TYPE` — defaults to `int8`
-- `YTDLP_COOKIE_FILE_CONTENT` — optional exported Netscape-format cookies for platforms that require a logged-in session
-
 ## Example bot output
 ```text
 📌 Title: Example Video Title
@@ -95,6 +89,7 @@ Summary:
 ## Notes
 - This MVP processes **public URLs only**.
 - Private, login-gated, DRM-protected, or unsupported pages will fail gracefully.
+- The hosted version intentionally supports only YouTube and normal article pages.
 - Whisper is **lazy-loaded** on first transcription request to keep startup fast.
 - Very long videos will work, but latency depends on your CPU and chosen Whisper model.
 - `tiny` is the best default for a free-tier MVP.
@@ -134,15 +129,10 @@ Notes:
 
 The bot does not require a public webhook URL because it uses Telegram long polling.
 
-### Platforms that still demand login
-Some public TikTok, Instagram, X/Twitter, or VK links may still require a logged-in browser session when fetched from a cloud server.
+### Unsupported social platforms
+The hosted version intentionally does not support TikTok, Instagram, X/Twitter, or VK links.
 
-For those cases:
-1. Export cookies for the target platform in Netscape cookie-file format.
-2. Add the full cookie file contents to Railway as `YTDLP_COOKIE_FILE_CONTENT`.
-3. Redeploy the service.
-
-This lets `yt-dlp` reuse that authenticated session remotely.
+These platforms often require authentication, device fingerprinting, or platform-specific anti-bot checks that are not reliable for a shared server-side bot.
 
 ## Troubleshooting
 ### 1. `ffmpeg` not found
