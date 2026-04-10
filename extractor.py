@@ -15,6 +15,8 @@ from bs4 import BeautifulSoup
 
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "20"))
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "tiny")
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
+WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
 MAX_ARTICLE_CHARS = int(os.getenv("MAX_ARTICLE_CHARS", "50000"))
 MAX_TRANSCRIPT_CHARS = int(os.getenv("MAX_TRANSCRIPT_CHARS", "80000"))
 
@@ -45,19 +47,25 @@ class WhisperTranscriber:
             with cls._lock:
                 if cls._model is None:
                     try:
-                        import whisper
+                        from faster_whisper import WhisperModel
                     except ImportError as exc:
                         raise ExtractionError(
-                            "Whisper is not installed. Run `pip install -r requirements.txt` first."
+                            "Whisper runtime is not installed. Run `pip install -r requirements.txt` first."
                         ) from exc
 
-                    cls._model = whisper.load_model(WHISPER_MODEL_NAME)
+                    cls._model = WhisperModel(
+                        WHISPER_MODEL_NAME,
+                        device=WHISPER_DEVICE,
+                        compute_type=WHISPER_COMPUTE_TYPE,
+                    )
         return cls._model
 
     @classmethod
     def transcribe(cls, file_path: str) -> dict:
         model = cls.get_model()
-        return model.transcribe(file_path, fp16=False, verbose=False)
+        segments, _info = model.transcribe(file_path)
+        text = " ".join(segment.text.strip() for segment in segments if segment.text).strip()
+        return {"text": text}
 
 
 SUPPORTED_MEDIA_PLATFORMS = {

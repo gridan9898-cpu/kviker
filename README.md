@@ -14,7 +14,7 @@ Production-oriented MVP Telegram bot that accepts a URL, extracts the underlying
 - `python-telegram-bot` v20+ (async)
 - `requests` + `BeautifulSoup4` for generic article extraction
 - `yt-dlp` for public media download
-- `openai-whisper` for local transcription
+- `faster-whisper` for local transcription
 - `Groq API` for summarization
 - No database
 - No paid APIs
@@ -75,6 +75,8 @@ Copy `.env.example` to `.env` and fill:
 - `GROQ_API_KEY` — free from Groq Console
 - `GROQ_MODEL` — defaults to `llama-3.1-8b-instant`
 - `WHISPER_MODEL` — `tiny` or `base`
+- `WHISPER_DEVICE` — defaults to `cpu`
+- `WHISPER_COMPUTE_TYPE` — defaults to `int8`
 
 ## Example bot output
 ```text
@@ -135,7 +137,7 @@ The bot does not require a public webhook URL because it uses Telegram long poll
 ### 1. `ffmpeg` not found
 Install `ffmpeg` and confirm `ffmpeg -version` works in the same shell session.
 
-### 2. `ModuleNotFoundError: whisper`
+### 2. `ModuleNotFoundError: faster_whisper`
 Re-run:
 ```bash
 pip install -r requirements.txt
