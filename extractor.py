@@ -17,6 +17,7 @@ REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "20"))
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "tiny")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
+YTDLP_COOKIE_FILE_CONTENT = os.getenv("YTDLP_COOKIE_FILE_CONTENT", "").strip()
 MAX_ARTICLE_CHARS = int(os.getenv("MAX_ARTICLE_CHARS", "50000"))
 MAX_TRANSCRIPT_CHARS = int(os.getenv("MAX_TRANSCRIPT_CHARS", "80000"))
 
@@ -246,7 +247,12 @@ def download_media(url: str, tmpdir: str) -> tuple[Optional[str], dict]:
         "skip_download": False,
     }
 
+    cookie_file_path = None
     try:
+        cookie_file_path = maybe_write_cookie_file(tmpdir)
+        if cookie_file_path:
+            ydl_opts["cookiefile"] = cookie_file_path
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             if info is None:
@@ -277,10 +283,27 @@ def download_media(url: str, tmpdir: str) -> tuple[Optional[str], dict]:
         if "unsupported" in lower_message:
             raise ExtractionError("This URL is not supported by yt-dlp in the current environment.") from exc
         if "login" in lower_message or "sign in" in lower_message:
-            raise ExtractionError("This media requires authentication and cannot be processed in this MVP.") from exc
+            raise ExtractionError(
+                "This media requires authentication. Add exported cookies to YTDLP_COOKIE_FILE_CONTENT for this platform."
+            ) from exc
         raise ExtractionError(f"Failed to download media: {message}") from exc
     except Exception as exc:
         raise ExtractionError(f"Unexpected media extraction error: {exc}") from exc
+    finally:
+        if cookie_file_path and os.path.exists(cookie_file_path):
+            os.remove(cookie_file_path)
+
+
+def maybe_write_cookie_file(tmpdir: str) -> Optional[str]:
+    if not YTDLP_COOKIE_FILE_CONTENT:
+        return None
+
+    cookie_file_path = os.path.join(tmpdir, "cookies.txt")
+    with open(cookie_file_path, "w", encoding="utf-8") as cookie_file:
+        cookie_file.write(YTDLP_COOKIE_FILE_CONTENT)
+        if not YTDLP_COOKIE_FILE_CONTENT.endswith("\n"):
+            cookie_file.write("\n")
+    return cookie_file_path
 
 
 def format_duration(seconds: int | float | None) -> str:

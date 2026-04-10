@@ -77,6 +77,7 @@ Copy `.env.example` to `.env` and fill:
 - `WHISPER_MODEL` — `tiny` or `base`
 - `WHISPER_DEVICE` — defaults to `cpu`
 - `WHISPER_COMPUTE_TYPE` — defaults to `int8`
+- `YTDLP_COOKIE_FILE_CONTENT` — optional exported Netscape-format cookies for platforms that require a logged-in session
 
 ## Example bot output
 ```text
@@ -132,6 +133,16 @@ Notes:
 4. Deploy the service.
 
 The bot does not require a public webhook URL because it uses Telegram long polling.
+
+### Platforms that still demand login
+Some public TikTok, Instagram, X/Twitter, or VK links may still require a logged-in browser session when fetched from a cloud server.
+
+For those cases:
+1. Export cookies for the target platform in Netscape cookie-file format.
+2. Add the full cookie file contents to Railway as `YTDLP_COOKIE_FILE_CONTENT`.
+3. Redeploy the service.
+
+This lets `yt-dlp` reuse that authenticated session remotely.
 
 ## Troubleshooting
 ### 1. `ffmpeg` not found
