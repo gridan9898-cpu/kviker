@@ -260,28 +260,24 @@ def download_media(url: str, tmpdir: str) -> tuple[Optional[str], dict]:
     }
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if info is None:
-                raise ExtractionError("yt-dlp could not extract metadata from this URL.")
-
-            if "entries" in info:
-                entries = info.get("entries") or []
-                info = next((entry for entry in entries if entry), None)
-                if not info:
-                    raise ExtractionError("Playlist-style URL returned no downloadable entry.")
-
-            media_path = ydl.prepare_filename(info)
-            if not os.path.exists(media_path):
-                files = [
-                    os.path.join(tmpdir, name)
-                    for name in os.listdir(tmpdir)
-                    if os.path.isfile(os.path.join(tmpdir, name))
-                ]
-                if files:
-                    media_path = max(files, key=os.path.getsize)
-
-            return media_path, info
+        try:
+            return extract_with_yt_dlp(url, tmpdir, ydl_opts)
+        except yt_dlp.utils.DownloadError as exc:
+            if is_youtube_url(url) and looks_like_auth_or_bot_gate(str(exc)):
+                fallback_opts = dict(ydl_opts)
+                fallback_opts["extractor_args"] = {
+                    "youtube": {
+                        "player_client": ["android", "web"],
+                    }
+                }
+                fallback_opts["http_headers"] = {
+                    "User-Agent": (
+                        "com.google.android.youtube/19.09.37 "
+                        "(Linux; U; Android 12; en_US) gzip"
+                    )
+                }
+                return extract_with_yt_dlp(url, tmpdir, fallback_opts)
+            raise
     except yt_dlp.utils.DownloadError as exc:
         message = str(exc)
         lower_message = message.lower()
@@ -290,10 +286,58 @@ def download_media(url: str, tmpdir: str) -> tuple[Optional[str], dict]:
         if "unsupported" in lower_message:
             raise ExtractionError("This URL is not supported by yt-dlp in the current environment.") from exc
         if "login" in lower_message or "sign in" in lower_message:
+            if is_youtube_url(url):
+                raise ExtractionError(
+                    "YouTube blocked server-side extraction for this video. "
+                    "Try another public video."
+                ) from exc
             raise ExtractionError("This media requires authentication and cannot be processed.") from exc
         raise ExtractionError(f"Failed to download media: {message}") from exc
     except Exception as exc:
         raise ExtractionError(f"Unexpected media extraction error: {exc}") from exc
+
+
+def extract_with_yt_dlp(url: str, tmpdir: str, ydl_opts: dict[str, Any]) -> tuple[Optional[str], dict]:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        if info is None:
+            raise ExtractionError("yt-dlp could not extract metadata from this URL.")
+
+        if "entries" in info:
+            entries = info.get("entries") or []
+            info = next((entry for entry in entries if entry), None)
+            if not info:
+                raise ExtractionError("Playlist-style URL returned no downloadable entry.")
+
+        media_path = ydl.prepare_filename(info)
+        if not os.path.exists(media_path):
+            files = [
+                os.path.join(tmpdir, name)
+                for name in os.listdir(tmpdir)
+                if os.path.isfile(os.path.join(tmpdir, name))
+            ]
+            if files:
+                media_path = max(files, key=os.path.getsize)
+
+        return media_path, info
+
+
+def is_youtube_url(url: str) -> bool:
+    domain = urlparse(url).netloc.lower()
+    domain = domain[4:] if domain.startswith("www.") else domain
+    return domain == "youtube.com" or domain.endswith(".youtube.com") or domain == "youtu.be"
+
+
+def looks_like_auth_or_bot_gate(message: str) -> bool:
+    lower_message = message.lower()
+    patterns = (
+        "login",
+        "sign in",
+        "authentication",
+        "confirm you're not a bot",
+        "use --cookies",
+    )
+    return any(pattern in lower_message for pattern in patterns)
 
 
 def format_duration(seconds: int | float | None) -> str:
