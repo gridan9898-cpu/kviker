@@ -56,7 +56,7 @@ ffmpeg -version
 ## Setup in under 10 commands
 ```bash
 git clone <your-repo-url>
-cd telegram_summary_bot
+cd kviker
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -97,9 +97,39 @@ Summary:
 - `tiny` is the best default for a free-tier MVP.
 
 ## Deploy options
-This bot runs locally with polling, or on a free VM/container host such as:
-- Railway free-tier compatible setup
-- Render free-tier compatible setup
+This bot runs locally with polling, or on any always-on Docker host such as:
+- Railway
+- Render
+- Fly.io
+- a small VPS
+
+## Remote deployment
+This repository is ready to deploy as a Dockerized service:
+- `Dockerfile` installs Python dependencies and `ffmpeg`
+- `bot.py` starts a tiny HTTP health endpoint when `PORT` is present
+- `render.yaml` configures Render Blueprint deployment with `/healthz`
+
+### Option A: Render
+1. Push this repository to GitHub.
+2. Open Render and create a new Blueprint or use the included `render.yaml`.
+3. Set:
+   - `TELEGRAM_BOT_TOKEN`
+   - `GROQ_API_KEY`
+4. Deploy.
+
+Notes:
+- Render Free web services spin down after 15 minutes without inbound traffic, so they are fine for testing but not ideal for a 24/7 Telegram polling bot.
+- For continuous remote runtime, use a paid always-on instance on Render or another always-on Docker host.
+
+### Option B: Railway
+1. Create a new Railway project from this GitHub repo.
+2. Railway will detect the `Dockerfile` automatically.
+3. Set:
+   - `TELEGRAM_BOT_TOKEN`
+   - `GROQ_API_KEY`
+4. Deploy the service.
+
+The bot does not require a public webhook URL because it uses Telegram long polling.
 
 ## Troubleshooting
 ### 1. `ffmpeg` not found

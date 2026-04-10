@@ -5,11 +5,10 @@ import re
 import threading
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 import requests
-import whisper
 import yt_dlp
 from bs4 import BeautifulSoup
 
@@ -37,7 +36,7 @@ class ExtractedContent:
 class WhisperTranscriber:
     """Lazy-loaded Whisper singleton to avoid slow bot startup."""
 
-    _model = None
+    _model: Any = None
     _lock = threading.Lock()
 
     @classmethod
@@ -45,6 +44,13 @@ class WhisperTranscriber:
         if cls._model is None:
             with cls._lock:
                 if cls._model is None:
+                    try:
+                        import whisper
+                    except ImportError as exc:
+                        raise ExtractionError(
+                            "Whisper is not installed. Run `pip install -r requirements.txt` first."
+                        ) from exc
+
                     cls._model = whisper.load_model(WHISPER_MODEL_NAME)
         return cls._model
 

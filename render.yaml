@@ -1,0 +1,18 @@
+services:
+  - type: web
+    runtime: docker
+    name: kviker-bot
+    plan: free
+    autoDeployTrigger: commit
+    healthCheckPath: /healthz
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+      - key: WHISPER_MODEL
+        value: tiny
+      - key: HEALTHCHECK_PATH
+        value: /healthz

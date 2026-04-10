@@ -48,17 +48,20 @@ class GroqSummarizer:
             f"Chunk #{index}:\n{chunk}"
         )
 
-        response = await self.client.chat.completions.create(
-            model=GROQ_MODEL,
-            temperature=0.2,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You compress content faithfully and keep only high-signal information.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-        )
+        try:
+            response = await self.client.chat.completions.create(
+                model=GROQ_MODEL,
+                temperature=0.2,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You compress content faithfully and keep only high-signal information.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            )
+        except Exception as exc:
+            raise SummarizationError(f"Groq chunk summarization request failed: {exc}") from exc
 
         content = response.choices[0].message.content
         if not content:
@@ -92,21 +95,24 @@ class GroqSummarizer:
             f"Content:\n{text}"
         )
 
-        response = await self.client.chat.completions.create(
-            model=GROQ_MODEL,
-            temperature=0.2,
-            response_format={"type": "json_object"},
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a precise summarizer. Output must be strict JSON only. "
-                        "Do not invent facts."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-        )
+        try:
+            response = await self.client.chat.completions.create(
+                model=GROQ_MODEL,
+                temperature=0.2,
+                response_format={"type": "json_object"},
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a precise summarizer. Output must be strict JSON only. "
+                            "Do not invent facts."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            )
+        except Exception as exc:
+            raise SummarizationError(f"Groq final summarization request failed: {exc}") from exc
 
         raw_content = response.choices[0].message.content
         if not raw_content:

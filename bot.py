@@ -5,7 +5,10 @@ import html
 import logging
 import os
 import re
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -30,6 +33,7 @@ logging.getLogger("telegram").setLevel(logging.INFO)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 TELEGRAM_MESSAGE_LIMIT = 4096
+DEFAULT_HEALTHCHECK_PATH = "/healthz"
 
 URL_RE = re.compile(r"https?://\S+|www\.\S+", flags=re.IGNORECASE)
 
@@ -187,10 +191,56 @@ def build_application() -> Application:
     return application
 
 
-if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+def maybe_start_healthcheck_server() -> Optional[ThreadingHTTPServer]:
+    port_value = os.getenv("PORT", "").strip()
+    if not port_value:
+        return None
 
-    app = build_application()
-    logger.info("Bot started")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        port = int(port_value)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid PORT value: {port_value}") from exc
+
+    healthcheck_path = os.getenv("HEALTHCHECK_PATH", DEFAULT_HEALTHCHECK_PATH).strip() or DEFAULT_HEALTHCHECK_PATH
+    health_paths = {"/", healthcheck_path}
+
+    class HealthcheckHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802 - stdlib handler name
+            request_path = urlsplit(self.path).path
+            if request_path not in health_paths:
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            body = b"ok"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            logger.debug("Healthcheck server: " + format, *args)
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), HealthcheckHandler)
+    thread = threading.Thread(
+        target=server.serve_forever,
+        name="healthcheck-server",
+        daemon=True,
+    )
+    thread.start()
+    logger.info("Healthcheck server listening on 0.0.0.0:%s%s", port, healthcheck_path)
+    return server
+
+
+if __name__ == "__main__":
+    health_server = maybe_start_healthcheck_server()
+
+    try:
+        app = build_application()
+        logger.info("Bot started")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    finally:
+        if health_server is not None:
+            health_server.shutdown()
+            health_server.server_close()
