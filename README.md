@@ -10,6 +10,7 @@ Production-oriented MVP Telegram bot that accepts a supported URL, extracts the 
 - `python-telegram-bot` v20+ (async)
 - `requests` + `BeautifulSoup4` for generic article extraction
 - `yt-dlp` for public media download
+- `youtube-transcript-api` for subtitle-first YouTube extraction
 - `faster-whisper` for local transcription
 - `Groq API` for summarization
 - No database
@@ -18,11 +19,12 @@ Production-oriented MVP Telegram bot that accepts a supported URL, extracts the 
 ## How it works
 1. User sends one URL.
 2. Bot detects the domain.
-3. If the URL is a YouTube video, it downloads the media audio with `yt-dlp`.
-4. Whisper transcribes locally.
-5. Groq generates a structured summary.
-6. Bot returns the result in Telegram.
-7. Temporary files are deleted automatically.
+3. If the URL is a YouTube video, the bot first tries to fetch existing YouTube subtitles.
+4. If subtitles are unavailable, it downloads the media audio with `yt-dlp`.
+5. Whisper transcribes locally when needed.
+6. Groq generates a structured summary.
+7. Bot returns the result in Telegram.
+8. Temporary files are deleted automatically.
 
 ## Prerequisites
 - Python 3.10+

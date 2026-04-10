@@ -4,5 +4,6 @@ beautifulsoup4>=4.12.2
 lxml>=5.2.1
 yt-dlp>=2025.3.31
 faster-whisper>=1.1.1
+youtube-transcript-api>=1.2.3
 python-dotenv>=1.0.1
 groq>=0.18.0

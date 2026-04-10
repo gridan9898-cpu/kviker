@@ -6,7 +6,7 @@ import threading
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
 from typing import Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import requests
 import yt_dlp
@@ -89,7 +89,7 @@ def extract_content(url: str) -> ExtractedContent:
     source = detect_source(normalized_url)
 
     if source == "YouTube":
-        return extract_media_content(normalized_url, source)
+        return extract_youtube_content(normalized_url)
 
     if source in {"TikTok", "Instagram", "Twitter/X", "VK"}:
         raise ExtractionError(
@@ -245,6 +245,25 @@ def extract_media_content(url: str, source: str) -> ExtractedContent:
         )
 
 
+def extract_youtube_content(url: str) -> ExtractedContent:
+    video_id = extract_youtube_video_id(url)
+    if video_id:
+        transcript_text = fetch_youtube_transcript(video_id)
+        if transcript_text:
+            title = fetch_youtube_title(url, video_id)
+            word_count = len(transcript_text.split())
+            return ExtractedContent(
+                title=title,
+                source="YouTube",
+                length=f"{word_count} transcript words",
+                content_type="media",
+                text=transcript_text[:MAX_TRANSCRIPT_CHARS],
+                url=url,
+            )
+
+    return extract_media_content(url, "YouTube")
+
+
 def download_media(url: str, tmpdir: str) -> tuple[Optional[str], dict]:
     ydl_opts = {
         "format": "bestaudio/best",
@@ -320,6 +339,63 @@ def extract_with_yt_dlp(url: str, tmpdir: str, ydl_opts: dict[str, Any]) -> tupl
                 media_path = max(files, key=os.path.getsize)
 
         return media_path, info
+
+
+def extract_youtube_video_id(url: str) -> Optional[str]:
+    parsed = urlparse(url)
+    domain = parsed.netloc.lower()
+    domain = domain[4:] if domain.startswith("www.") else domain
+
+    if domain == "youtu.be":
+        video_id = parsed.path.strip("/")
+        return video_id or None
+
+    if domain == "youtube.com" or domain.endswith(".youtube.com"):
+        if parsed.path == "/watch":
+            video_id = parse_qs(parsed.query).get("v", [""])[0].strip()
+            return video_id or None
+
+        if parsed.path.startswith("/shorts/") or parsed.path.startswith("/embed/"):
+            parts = [part for part in parsed.path.split("/") if part]
+            if len(parts) >= 2:
+                return parts[1]
+
+    return None
+
+
+def fetch_youtube_transcript(video_id: str) -> Optional[str]:
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+
+        transcript_api = YouTubeTranscriptApi()
+        transcript_list = list(transcript_api.list(video_id))
+        if not transcript_list:
+            return None
+
+        preferred = next((transcript for transcript in transcript_list if not transcript.is_generated), transcript_list[0])
+        fetched_transcript = preferred.fetch()
+        transcript_text = " ".join(snippet.text.strip() for snippet in fetched_transcript if snippet.text).strip()
+        return transcript_text or None
+    except Exception:
+        return None
+
+
+def fetch_youtube_title(url: str, video_id: str) -> str:
+    try:
+        response = requests.get(
+            "https://www.youtube.com/oembed",
+            params={"url": url, "format": "json"},
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        title = str(payload.get("title", "")).strip()
+        if title:
+            return title
+    except requests.RequestException:
+        pass
+
+    return f"YouTube video {video_id}"
 
 
 def is_youtube_url(url: str) -> bool:
